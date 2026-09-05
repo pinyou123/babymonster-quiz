@@ -189,283 +189,256 @@ HTML_TEMPLATE = """
     </div>
 
    <script>
-        const socket = io();
-        let myName = "";
-        let myRoom = ""; // 💡 儲存後端發配的個人專屬獨立房間 ID
-        let timerInterval = null;
-        let timeLeft = 10;
-        let hasAnswered = false;
-        let isMusicPlaying = true;
+    const socket = io();
+    let myName = "";
+    let myRoom = "";
+    let timerInterval = null;
+    let timeLeft = 10;
+    let hasAnswered = false;
+    let isMusicPlaying = true;
 
-        // 💡 自動播放核心監聽
-        function initAutoplay() {
-            const startMusicOnFirstClick = () => {
-                const bgm = document.getElementById('lobby-bgm');
-                if (bgm && isMusicPlaying && bgm.paused) {
-                    bgm.volume = 0.4;
-                    bgm.play().then(() => {
-                        console.log("自動播放成功！");
-                    }).catch(err => console.log("自動播放等待互動:", err));
-                }
-                document.removeEventListener('click', startMusicOnFirstClick);
-                document.removeEventListener('keydown', startMusicOnFirstClick);
-            };
+    // 💡 自動播放核心監聽
+    function initAutoplay() {
+        const startMusicOnFirstClick = () => {
+            const bgm = document.getElementById('lobby-bgm');
+            if (bgm && isMusicPlaying && bgm.paused) {
+                bgm.volume = 0.4;
+                bgm.play().then(() => {
+                    console.log("自動播放成功！");
+                }).catch(err => console.log("自動播放等待互動:", err));
+            }
+            document.removeEventListener('click', startMusicOnFirstClick);
+            document.removeEventListener('keydown', startMusicOnFirstClick);
+        };
 
-            document.addEventListener('click', startMusicOnFirstClick);
-            document.addEventListener('keydown', startMusicOnFirstClick);
+        document.addEventListener('click', startMusicOnFirstClick);
+        document.addEventListener('keydown', startMusicOnFirstClick);
+    }
+
+    // 💡 1. 頁面載入時檢查紀錄
+    window.addEventListener('DOMContentLoaded', () => {
+        initAutoplay();
+        
+        const savedName = sessionStorage.getItem('quiz_username');
+        const savedBias = sessionStorage.getItem('quiz_bias');
+        if (savedName) {
+            document.getElementById('username').value = savedName;
+            myName = savedName;
+            if (savedBias) {
+                const biasRadio = document.querySelector(`input[name="bias"][value="${savedBias}"]`);
+                if (biasRadio) biasRadio.checked = true;
+            }
+            socket.emit('join_room', { name: savedName, bias: savedBias || 'Ruka' });
         }
-
-        // 💡 1. 頁面載入時檢查是否有未完成的遊戲紀錄（重連機制）
-window.addEventListener('DOMContentLoaded', () => {
-    initAutoplay();
-    
-    const savedName = sessionStorage.getItem('quiz_username');
-    const savedBias = sessionStorage.getItem('quiz_bias');
-    if (savedName) {
-        document.getElementById('username').value = savedName;
-        myName = savedName;
-        if (savedBias) {
-            const biasRadio = document.querySelector(`input[name="bias"][value="${savedBias}"]`);
-            if (biasRadio) biasRadio.checked = true;
-        }
-        socket.emit('join_room', { name: savedName, bias: savedBias || 'Ruka' });
-    }
-});
-
-function toggleMusic(e) {
-    if (e) e.stopPropagation();
-    const bgm = document.getElementById('lobby-bgm');
-    const btn = document.getElementById('bgm-toggle-btn');
-    if (!bgm) return;
-
-    if (bgm.paused) {
-        bgm.volume = 0.4;
-        bgm.play().then(() => {
-            isMusicPlaying = true;
-            if (btn) btn.innerText = "🎵 音樂: ON";
-        });
-    } else {
-        bgm.pause();
-        isMusicPlaying = false;
-        if (btn) btn.innerText = "🔇 音樂: OFF";
-    }
-}
-
-// 💡 2. 玩家登入並儲存資料到 Session
-function joinGame() {
-    myName = document.getElementById('username').value.trim();
-    const biasEl = document.querySelector('input[name="bias"]:checked');
-    const bias = biasEl ? biasEl.value : 'Ruka';
-
-    if (!myName) return alert("請輸入暱稱！");
-
-    sessionStorage.setItem('quiz_username', myName);
-    sessionStorage.setItem('quiz_bias', bias);
-
-    const bgm = document.getElementById('lobby-bgm');
-    if (bgm && isMusicPlaying && bgm.paused) {
-        bgm.volume = 0.4;
-        bgm.play().catch(err => console.log("音樂播放受限:", err));
-    }
-
-    socket.emit('join_room', { name: myName, bias: bias });
-}
-
-// 💡 3. 核心修復：接收專屬房間號，並將畫面切換至大廳（解決卡住問題）
-socket.on('room_assigned', (data) => {
-    myRoom = data.room; // 保存後端發配的個人獨立房間號
-    document.getElementById('setup-view').classList.add('hidden');
-    document.getElementById('lobby-view').classList.remove('hidden');
-
-    let html = "<h4 style='color:#ffffff; margin-bottom:10px; font-size:14px;'>大廳玩家:</h4>";
-    data.players.forEach(p => { 
-        html += `<div class="roster-item">
-            👤 <b>${p.name}</b> - <span style="color:#cbd5e1;">本命:</span> <span style="color:#ff758c; font-weight:bold;">${p.bias}</span>
-        </div>`; 
     });
-    document.getElementById('player-list').innerHTML = html;
-});
 
-        // 💡 接收後端發配的個人獨立房間，並渲染個人大廳
-        socket.on('room_assigned', (data) => {
-            myRoom = data.room;
-            document.getElementById('setup-view').classList.add('hidden');
-            document.getElementById('lobby-view').classList.remove('hidden');
+    function toggleMusic(e) {
+        if (e) e.stopPropagation();
+        const bgm = document.getElementById('lobby-bgm');
+        const btn = document.getElementById('bgm-toggle-btn');
+        if (!bgm) return;
 
-            let html = "<h4 style='color:#ffffff; margin-bottom:10px; font-size:14px;'>大廳玩家:</h4>";
-            data.players.forEach(p => { 
-                html += `<div class="roster-item">
-                    👤 <b>${p.name}</b> - <span style="color:#cbd5e1;">本命:</span> <span style="color:#ff758c; font-weight:bold;">${p.bias}</span>
-                </div>`; 
+        if (bgm.paused) {
+            bgm.volume = 0.4;
+            bgm.play().then(() => {
+                isMusicPlaying = true;
+                if (btn) btn.innerText = "🎵 音樂: ON";
             });
-            document.getElementById('player-list').innerHTML = html;
-        });
+        } else {
+            bgm.pause();
+            isMusicPlaying = false;
+            if (btn) btn.innerText = "🔇 音樂: OFF";
+        }
+    }
 
-        function startGame() {
-            socket.emit('start_game', { room: myRoom });
+    // 💡 2. 玩家加入遊戲
+    function joinGame() {
+        myName = document.getElementById('username').value.trim();
+        const biasEl = document.querySelector('input[name="bias"]:checked');
+        const bias = biasEl ? biasEl.value : 'Ruka';
+
+        if (!myName) return alert("請輸入暱稱！");
+
+        sessionStorage.setItem('quiz_username', myName);
+        sessionStorage.setItem('quiz_bias', bias);
+
+        const bgm = document.getElementById('lobby-bgm');
+        if (bgm && isMusicPlaying && bgm.paused) {
+            bgm.volume = 0.4;
+            bgm.play().catch(err => console.log("音樂播放受限:", err));
         }
 
-        // 接收新題目
-        socket.on('new_question', (data) => {
-            document.getElementById('setup-view').classList.add('hidden');
-            document.getElementById('lobby-view').classList.add('hidden');
-            document.getElementById('game-view').classList.remove('hidden');
+        socket.emit('join_room', { name: myName, bias: bias });
+    }
 
-            hasAnswered = false;
-            clearInterval(timerInterval);
+    // 💡 3. 接收專屬房間號並顯示大廳
+    socket.on('room_assigned', (data) => {
+        myRoom = data.room;
+        document.getElementById('setup-view').classList.add('hidden');
+        document.getElementById('lobby-view').classList.remove('hidden');
 
-            let q = data.question;
-            let scoreText = q.score ? ` (${q.score}分)` : '';
-            
-            let html = `
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:#ff2a75; font-weight:bold;">第 ${data.index + 1} / ${data.total} 題${scoreText}</span>
-                    <span id="timer-text" style="color:#fff; font-weight:bold;">⏱️ 10 秒</span>
-                </div>
-                <div class="timer-container"><div id="timer-bar" class="timer-bar"></div></div>
+        let html = "<h4 style='color:#ffffff; margin-bottom:10px; font-size:14px;'>大廳玩家:</h4>";
+        data.players.forEach(p => { 
+            html += `<div class="roster-item">
+                👤 <b>${p.name}</b> - <span style="color:#cbd5e1;">本命:</span> <span style="color:#ff758c; font-weight:bold;">${p.bias}</span>
+            </div>`; 
+        });
+        document.getElementById('player-list').innerHTML = html;
+    });
+
+    function startGame() {
+        socket.emit('start_game', { room: myRoom });
+    }
+
+    // 💡 4. 接收新題目
+    socket.on('new_question', (data) => {
+        document.getElementById('setup-view').classList.add('hidden');
+        document.getElementById('lobby-view').classList.add('hidden');
+        document.getElementById('game-view').classList.remove('hidden');
+
+        hasAnswered = false;
+        clearInterval(timerInterval);
+
+        let q = data.question;
+        let scoreText = q.base_score ? ` (${q.base_score}分)` : '';
+        
+        let html = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:#ff2a75; font-weight:bold;">第 ${data.index + 1} / ${data.total} 題${scoreText}</span>
+                <span id="timer-text" style="color:#fff; font-weight:bold;">⏱️ 10 秒</span>
+            </div>
+            <div class="timer-container"><div id="timer-bar" class="timer-bar"></div></div>
+        `;
+
+        if (q.image_url) {
+            html += `<img src="${q.image_url}" class="quiz-image" style="width:100%; max-height:180px; object-fit:cover; border-radius:10px; margin-bottom:12px;" alt="題目圖片">`;
+        }
+
+        if (q.video_url) {
+            html += `
+                <video id="quiz-video" src="${q.video_url}" autoplay muted playsinline 
+                       style="width:100%; max-height:200px; border-radius:10px; margin-bottom:12px; object-fit:cover;">
+                </video>
             `;
-
-            // 1. 圖片題渲染
-            if (q.image_url) {
-                html += `<img src="${q.image_url}" class="quiz-image" style="width:100%; max-height:180px; object-fit:cover; border-radius:10px; margin-bottom:12px;" alt="題目圖片">`;
-            }
-
-            // 2. 影片題渲染（強制靜音）
-            if (q.video_url) {
-                html += `
-                    <video id="quiz-video" src="${q.video_url}" autoplay muted playsinline 
-                           style="width:100%; max-height:200px; border-radius:10px; margin-bottom:12px; object-fit:cover;">
-                    </video>
-                `;
-            }
-
-            html += `<p style="font-size:15px; font-weight:bold; margin-bottom:15px; color:#fff;">${q.question}</p>`;
-            html += `<div id="options-box">`;
-
-            // 渲染選項
-            if (q.options) {
-                q.options.forEach(opt => {
-                    html += `<button class="quiz-option" onclick="clickAnswer(this, '${opt}', '${q.answer}')">${opt}</button>`;
-                });
-            }
-            html += `</div>`;
-
-            document.getElementById('quiz-box').innerHTML = html;
-
-            // 💡 判斷：如果是影片題，先禁用所有按鈕，等影片結束才解鎖並開始計時
-            const videoEl = document.getElementById('quiz-video');
-            if (videoEl) {
-                // 1. 禁用所有選項按鈕
-                const allBtns = document.querySelectorAll('.quiz-option');
-                allBtns.forEach(b => b.disabled = true);
-                
-                document.getElementById('timer-text').innerText = "🎥 觀看影片中...";
-
-                // 2. 影片播放結束時解鎖按鈕並開始倒數
-                videoEl.onended = () => {
-                    allBtns.forEach(b => b.disabled = false);
-                    startTimer(q.answer);
-                };
-
-                // 防呆：若影片載入失敗，3 秒後強制解鎖並開跑
-                videoEl.onerror = () => {
-                    allBtns.forEach(b => b.disabled = false);
-                    startTimer(q.answer);
-                };
-            } else {
-                // 文字題與圖片題：直接開始倒數
-                startTimer(q.answer);
-            }
-        });
-
-        function startTimer(correctAnswer) {
-            timeLeft = 10;
-            const bar = document.getElementById('timer-bar');
-            const text = document.getElementById('timer-text');
-
-            timerInterval = setInterval(() => {
-                timeLeft -= 0.1;
-                if (timeLeft <= 0) {
-                    timeLeft = 0;
-                    clearInterval(timerInterval);
-                    if (!hasAnswered) {
-                        timeOutAnswer(correctAnswer);
-                    }
-                }
-                text.innerText = `⏱️ ${Math.ceil(timeLeft)} 秒`;
-                bar.style.width = `${(timeLeft / 10) * 100}%`;
-            }, 100);
         }
 
-        function clickAnswer(btn, selected, correct) {
-            if (hasAnswered) return;
-            hasAnswered = true;
-            clearInterval(timerInterval);
+        html += `<p style="font-size:15px; font-weight:bold; margin-bottom:15px; color:#fff;">${q.question}</p>`;
+        html += `<div id="options-box">`;
 
+        if (q.options) {
+            q.options.forEach(opt => {
+                html += `<button class="quiz-option" onclick="clickAnswer(this, '${opt}', '${q.answer}')">${opt}</button>`;
+            });
+        }
+        html += `</div>`;
+
+        document.getElementById('quiz-box').innerHTML = html;
+
+        const videoEl = document.getElementById('quiz-video');
+        if (videoEl) {
             const allBtns = document.querySelectorAll('.quiz-option');
             allBtns.forEach(b => b.disabled = true);
+            
+            document.getElementById('timer-text').innerText = "🎥 觀看影片中...";
 
-            const isCorrect = (selected === correct);
+            videoEl.onended = () => {
+                allBtns.forEach(b => b.disabled = false);
+                startTimer(q.answer);
+            };
 
-            if (isCorrect) {
-                btn.classList.add('correct');
-            } else {
-                btn.classList.add('wrong');
-                allBtns.forEach(b => {
-                    if (b.innerText === correct) b.classList.add('correct');
-                });
-            }
-
-            setTimeout(() => {
-                socket.emit('submit_answer', {
-                    room: myRoom,
-                    name: myName,
-                    is_correct: isCorrect,
-                    time_left: timeLeft
-                });
-            }, 1200);
+            videoEl.onerror = () => {
+                allBtns.forEach(b => b.disabled = false);
+                startTimer(q.answer);
+            };
+        } else {
+            startTimer(q.answer);
         }
-
-        function timeOutAnswer(correct) {
-            hasAnswered = true;
-            const allBtns = document.querySelectorAll('.quiz-option');
-            allBtns.forEach(b => {
-                b.disabled = true;
-                if (b.innerText === correct) b.classList.add('correct');
-            });
-
-            setTimeout(() => {
-                socket.emit('submit_answer', {
-                    room: myRoom,
-                    name: myName,
-                    is_correct: false,
-                    time_left: 0
-                });
-            }, 1200);
-        }
-
-        // 💡 3. 遊戲結束時清除紀錄
-socket.on('game_over', (data) => {
-    sessionStorage.removeItem('quiz_username');
-    sessionStorage.removeItem('quiz_bias');
-    clearInterval(timerInterval);
-    
-    // 1. 將標題改為「最終分數」
-    let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終分數</h2>`;
-    
-    // 2. 移除「第 X 名」，僅顯示玩家暱稱、本命與總得分
-    data.leaderboard.forEach((p) => {
-        html += `<div class="roster-item">
-            玩家: <b>${p.name}</b> (${p.bias}) <br>
-            總得分: <span style="color:#ff2a75; font-weight:bold; font-size:16px;">${p.score}</span> 分
-        </div>`;
     });
 
-    html += `<button class="btn-submit" onclick="location.reload()" style="margin-top:20px;">🔄 再次挑戰</button>`;
-    document.getElementById('quiz-box').innerHTML = html;
-});
+    function startTimer(correctAnswer) {
+        timeLeft = 10;
+        const bar = document.getElementById('timer-bar');
+        const text = document.getElementById('timer-text');
+
+        timerInterval = setInterval(() => {
+            timeLeft -= 0.1;
+            if (timeLeft <= 0) {
+                timeLeft = 0;
+                clearInterval(timerInterval);
+                if (!hasAnswered) {
+                    timeOutAnswer(correctAnswer);
+                }
+            }
+            text.innerText = `⏱️ ${Math.ceil(timeLeft)} 秒`;
+            bar.style.width = `${(timeLeft / 10) * 100}%`;
+        }, 100);
+    }
+
+    function clickAnswer(btn, selected, correct) {
+        if (hasAnswered) return;
+        hasAnswered = true;
+        clearInterval(timerInterval);
+
+        const allBtns = document.querySelectorAll('.quiz-option');
+        allBtns.forEach(b => b.disabled = true);
+
+        const isCorrect = (selected === correct);
+
+        if (isCorrect) {
+            btn.classList.add('correct');
+        } else {
+            btn.classList.add('wrong');
+            allBtns.forEach(b => {
+                if (b.innerText === correct) b.classList.add('correct');
+            });
+        }
+
+        setTimeout(() => {
+            socket.emit('submit_answer', {
+                room: myRoom,
+                name: myName,
+                is_correct: isCorrect,
+                time_left: timeLeft
+            });
+        }, 1200);
+    }
+
+    function timeOutAnswer(correct) {
+        hasAnswered = true;
+        const allBtns = document.querySelectorAll('.quiz-option');
+        allBtns.forEach(b => {
+            b.disabled = true;
+            if (b.innerText === correct) b.classList.add('correct');
         });
-    </script>
+
+        setTimeout(() => {
+            socket.emit('submit_answer', {
+                room: myRoom,
+                name: myName,
+                is_correct: false,
+                time_left: 0
+            });
+        }, 1200);
+    }
+
+    // 💡 5. 遊戲結束顯示最終分數
+    socket.on('game_over', (data) => {
+        sessionStorage.removeItem('quiz_username');
+        sessionStorage.removeItem('quiz_bias');
+        clearInterval(timerInterval);
+        
+        let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終分數</h2>`;
+        data.leaderboard.forEach((p) => {
+            html += `<div class="roster-item">
+                玩家: <b>${p.name}</b> (${p.bias}) <br>
+                總得分: <span style="color:#ff2a75; font-weight:bold; font-size:16px;">${p.score}</span> 分
+            </div>`;
+        });
+
+        html += `<button class="btn-submit" onclick="location.reload()" style="margin-top:20px;">🔄 再次挑戰</button>`;
+        document.getElementById('quiz-box').innerHTML = html;
+    });
+</script>
 </body>
 </html>
 """
