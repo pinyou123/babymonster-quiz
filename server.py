@@ -281,9 +281,9 @@ HTML_TEMPLATE = """
         socket.emit('join_room', { name: myName, bias: bias });
     }
 
-    // 💡 3. 接收專屬房間號並顯示大廳
+    // 💡 3. 接收專屬房間號，並紀錄 myRoom
     socket.on('room_assigned', (data) => {
-        myRoom = data.room;
+        myRoom = data.room; // 確保有拿到房間號
         document.getElementById('setup-view').classList.add('hidden');
         document.getElementById('lobby-view').classList.remove('hidden');
 
@@ -296,12 +296,13 @@ HTML_TEMPLATE = """
         document.getElementById('player-list').innerHTML = html;
     });
 
-    function startGame() {
-        socket.emit('start_game', { room: myRoom });
-    }
-
-    // 💡 4. 接收新題目
+    // 💡 4. 接收新題目（防刷新關鍵：如果 myRoom 是空的，自動從暱稱重新綁定）
     socket.on('new_question', (data) => {
+        // 防刷新修復：重新整理後如果 myRoom 丟失，自動用暱稱補回房間 ID
+        if (!myRoom && myName) {
+            myRoom = "user_" + myName;
+        }
+
         document.getElementById('setup-view').classList.add('hidden');
         document.getElementById('lobby-view').classList.add('hidden');
         document.getElementById('game-view').classList.remove('hidden');
