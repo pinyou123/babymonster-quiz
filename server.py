@@ -96,7 +96,7 @@ HTML_TEMPLATE = """
             cursor: pointer; margin-top: 10px; box-shadow: 0 4px 15px rgba(255, 42, 117, 0.5);
         }
 
-        .hidden { display: none; }
+        .hidden { display: none !important; }
 
         .roster-item {
             background: rgba(15, 23, 42, 0.75); color: #ffffff; padding: 10px 14px;
@@ -259,15 +259,14 @@ HTML_TEMPLATE = """
         </div>
     </div>
     
-    <!-- 💡 請把遊戲說明彈窗 Modal 直接塞在這裡（.container 外面、<script> 上面） -->
+    <!-- 💡 確保有加上 hidden 類別，這樣預設就不會自動跳出來 -->
     <div id="rules-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <h2 style="color:#ff2a75; margin-bottom:15px; text-align:center;">📜 遊戲規則說明</h2>
             <div class="rules-body">
-                <p><b>1. 答題時間：</b>每題有 10 秒倒數時間（影片題會先播放完畢才開始倒數）。</p>
+                <p><b>1. 答題時間：</b>每題有 10 秒倒數時間（影片題會先播放完畢才開始倒數且才能點選選項）。</p>
                 <p><b>2. 計分方式：</b>答對獲得題目基礎分 + 剩餘時間加分；答錯不倒扣。</p>
-                <p><b>3. 題型種類：</b>包含文字題、圖片題以及影片題，考驗你對 BABYMONSTER 的熟悉度！</p>
-                <p><b>4. 防刷機制：</b>遊戲中途重載將繼續回答當前題目，且不顯示正確答案選項。</p>
+                <p><b>3. 題型種類：</b>包含文字題、圖片題以及影片題。</p>
             </div>
             <button class="btn-submit" onclick="closeRulesModal()" style="margin-top:15px;">返回主頁</button>
         </div>
