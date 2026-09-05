@@ -193,6 +193,26 @@ HTML_TEMPLATE = """
             .music-controls { top: 10px; right: 10px; }
             .music-btn, .music-select { padding: 6px 10px; font-size: 12px; }
         }
+        
+        .developer-footer {
+    margin-top: 20px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    text-align: center;
+    font-size: 11px;
+    color: #94a3b8;
+}
+.developer-footer a {
+    color: #ff758c;
+    text-decoration: none;
+    font-weight: bold;
+    margin: 0 4px;
+    transition: color 0.2s;
+}
+.developer-footer a:hover {
+    color: #ff2a75;
+    text-decoration: underline;
+}
     </style>
 </head>
 <body>
@@ -257,6 +277,13 @@ HTML_TEMPLATE = """
         <div id="game-view" class="hidden">
             <div id="quiz-box"></div>
         </div>
+        
+        <!-- 💡 請把開發者資訊貼在這裡 -->
+        <div class="developer-footer">
+            開發者：<b>Pinyou Liu</b><br>
+            IG / Threads：@pinyou890201
+        </div>
+
     </div>
     
     <!-- 💡 確保有加上 hidden 類別，這樣預設就不會自動跳出來 -->
