@@ -289,8 +289,7 @@ HTML_TEMPLATE = """
     function startGame() {
         socket.emit('start_game', { room: myRoom });
     }
-
-    // 💡 4. 接收新題目
+// 💡 4. 接收新題目
     socket.on('new_question', (data) => {
         document.getElementById('setup-view').classList.add('hidden');
         document.getElementById('lobby-view').classList.add('hidden');
@@ -374,6 +373,7 @@ HTML_TEMPLATE = """
         }, 100);
     }
 
+    // 💡 點擊選項（不顯示真正的正確答案）
     function clickAnswer(btn, selected, correct) {
         if (hasAnswered) return;
         hasAnswered = true;
@@ -384,13 +384,11 @@ HTML_TEMPLATE = """
 
         const isCorrect = (selected === correct);
 
+        // 💡 答對變綠，答錯只讓點選的按鈕變紅，不顯示正確答案
         if (isCorrect) {
             btn.classList.add('correct');
         } else {
             btn.classList.add('wrong');
-            allBtns.forEach(b => {
-                if (b.innerText === correct) b.classList.add('correct');
-            });
         }
 
         setTimeout(() => {
@@ -403,12 +401,12 @@ HTML_TEMPLATE = """
         }, 1200);
     }
 
+    // 💡 超時未答（僅鎖定按鈕，不顯示正確答案）
     function timeOutAnswer(correct) {
         hasAnswered = true;
         const allBtns = document.querySelectorAll('.quiz-option');
         allBtns.forEach(b => {
             b.disabled = true;
-            if (b.innerText === correct) b.classList.add('correct');
         });
 
         setTimeout(() => {
@@ -449,13 +447,14 @@ def index():
 
 @socketio.on('join_room')
 def handle_join(data):
-    # 💡 使用玩家當前的 Socket 連線 ID 作為個人專屬房間，實現完全獨立遊玩
-    room = request.sid
-    name = data['name']
+    name = data['name'].strip()
     bias = data['bias']
+    
+    # 💡 核心修改：使用「暱稱」當作房間 ID（防刷新關閉）
+    room = f"user_{name}"
     join_room(room)
 
-    # 1. 建立或重置房間（當上局已結束時）
+    # 1. 建立或重置房間（當房間不存在或上局已結束時）
     if room not in ROOMS or ROOMS[room].get("status") == "FINISHED":
         ROOMS[room] = {
             "players": [],
@@ -466,14 +465,14 @@ def handle_join(data):
 
     r = ROOMS[room]
 
-    # 2. 檢查玩家是否已經存在（更新本命，不重複新增）
+    # 2. 檢查玩家資料
     player = next((p for p in r['players'] if p['name'] == name), None)
     if not player:
         r['players'].append({"name": name, "bias": bias, "score": 0})
     else:
-        player['bias'] = bias  # 若重複連線，僅更新本命資料
+        player['bias'] = bias
 
-    # 3. 核心：如果遊戲進行中，直接把玩家拉回當前的題目（防刷新刷分）
+    # 💡 3. 防刷新：如果遊戲正在進行中，帶回當前題目
     if r['status'] == "PLAYING":
         q_idx = r['current_q']
         if q_idx < len(r['selected_questions']):
@@ -481,10 +480,10 @@ def handle_join(data):
                 "question": r['selected_questions'][q_idx],
                 "index": q_idx,
                 "total": len(r['selected_questions'])
-            })
-            return  # 結束流程，不更新大廳列表
+            }, room=room)
+            return  # 成功留在遊戲內，不跳回大廳
 
-    # 4. 回傳個人專屬房間 ID 給前端並更新個人大廳
+    # 4. 未在遊戲中則正常回傳房間並顯示大廳
     emit('room_assigned', {"room": room, "players": r['players']}, room=room)
 
 @socketio.on('start_game')

@@ -235,7 +235,7 @@ QUESTION_PICTURE = [
     },
     {"id": 3,
     "question": "2026 TIMA 頒獎典禮上 ASA 這邊用中文說了什麼？",
-    "image_url": "/static/ahyeon2.jpg",
+    "image_url": "/static/asa1.jpg",
     "options": ["我們沒有大家真的活不下去", "我很喜歡站在舞台上看到大家的笑容", "看到大家跟我們一起享受舞台很開心", "送給我們MONSTIEZ"],
     "answer": "我們沒有大家真的活不下去"
     },
