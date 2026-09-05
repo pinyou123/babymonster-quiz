@@ -298,11 +298,10 @@ HTML_TEMPLATE = """
 
     // 💡 4. 接收新題目（防刷新關鍵：如果 myRoom 是空的，自動從暱稱重新綁定）
     socket.on('new_question', (data) => {
-        // 防刷新修復：重新整理後如果 myRoom 丟失，自動用暱稱補回房間 ID
-        if (!myRoom && myName) {
-            myRoom = "user_" + myName;
-        }
+        // 1. 強制確保 myRoom 有值
+        if (!myRoom && myName) myRoom = "user_" + myName;
 
+        // 2. 核心修復：強制隱藏登入與大廳畫面，開啟遊戲視窗
         document.getElementById('setup-view').classList.add('hidden');
         document.getElementById('lobby-view').classList.add('hidden');
         document.getElementById('game-view').classList.remove('hidden');
