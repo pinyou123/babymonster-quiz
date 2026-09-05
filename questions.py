@@ -132,7 +132,7 @@ QUESTION2 = [
     {"id":75,
     "question": "誰在寶怪屋EP2中買了玩具小強？",
     "options": ["CHIQUITA", "RORA", "RUKA", "AHYEON"],
-    "answer": "ChIQUITA"},
+    "answer": "CHIQUITA"},
     
     {"id": 11, 
      "question": "以下哪首歌曲跟其他歌曲是不同張專輯的？",
