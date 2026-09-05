@@ -3,6 +3,9 @@ import random
 import copy
 from gevent import monkey
 
+import uuid
+from flask import request
+
 if 'spyder_kernels' not in sys.modules:
     monkey.patch_all()
 
@@ -185,10 +188,10 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
-    <script>
+   <script>
         const socket = io();
         let myName = "";
-        let currentRoom = "global_room";
+        let myRoom = ""; // 💡 儲存後端發配的個人專屬獨立房間 ID
         let timerInterval = null;
         let timeLeft = 10;
         let hasAnswered = false;
@@ -225,7 +228,7 @@ HTML_TEMPLATE = """
                     const biasRadio = document.querySelector(`input[name="bias"][value="${savedBias}"]`);
                     if (biasRadio) biasRadio.checked = true;
                 }
-                socket.emit('join_room', { name: savedName, bias: savedBias || 'Ruka', room: currentRoom });
+                socket.emit('join_room', { name: savedName, bias: savedBias || 'Ruka' });
             }
         });
 
@@ -265,10 +268,12 @@ HTML_TEMPLATE = """
                 bgm.play().catch(err => console.log("音樂播放受限:", err));
             }
 
-            socket.emit('join_room', { name: myName, bias: bias, room: currentRoom });
+            socket.emit('join_room', { name: myName, bias: bias });
         }
 
-        socket.on('room_updated', (data) => {
+        // 💡 接收後端發配的個人獨立房間，並渲染個人大廳
+        socket.on('room_assigned', (data) => {
+            myRoom = data.room;
             document.getElementById('setup-view').classList.add('hidden');
             document.getElementById('lobby-view').classList.remove('hidden');
 
@@ -282,81 +287,81 @@ HTML_TEMPLATE = """
         });
 
         function startGame() {
-            socket.emit('start_game', { room: currentRoom });
+            socket.emit('start_game', { room: myRoom });
         }
 
         // 接收新題目
         socket.on('new_question', (data) => {
-    document.getElementById('setup-view').classList.add('hidden');
-    document.getElementById('lobby-view').classList.add('hidden');
-    document.getElementById('game-view').classList.remove('hidden');
+            document.getElementById('setup-view').classList.add('hidden');
+            document.getElementById('lobby-view').classList.add('hidden');
+            document.getElementById('game-view').classList.remove('hidden');
 
-    hasAnswered = false;
-    clearInterval(timerInterval);
+            hasAnswered = false;
+            clearInterval(timerInterval);
 
-    let q = data.question;
-    let scoreText = q.score ? ` (${q.score}分)` : '';
-    
-    let html = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="color:#ff2a75; font-weight:bold;">第 ${data.index + 1} / ${data.total} 題${scoreText}</span>
-            <span id="timer-text" style="color:#fff; font-weight:bold;">⏱️ 10 秒</span>
-        </div>
-        <div class="timer-container"><div id="timer-bar" class="timer-bar"></div></div>
-    `;
+            let q = data.question;
+            let scoreText = q.score ? ` (${q.score}分)` : '';
+            
+            let html = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#ff2a75; font-weight:bold;">第 ${data.index + 1} / ${data.total} 題${scoreText}</span>
+                    <span id="timer-text" style="color:#fff; font-weight:bold;">⏱️ 10 秒</span>
+                </div>
+                <div class="timer-container"><div id="timer-bar" class="timer-bar"></div></div>
+            `;
 
-    // 1. 圖片題渲染
-    if (q.image_url) {
-        html += `<img src="${q.image_url}" class="quiz-image" style="width:100%; max-height:180px; object-fit:cover; border-radius:10px; margin-bottom:12px;" alt="題目圖片">`;
-    }
+            // 1. 圖片題渲染
+            if (q.image_url) {
+                html += `<img src="${q.image_url}" class="quiz-image" style="width:100%; max-height:180px; object-fit:cover; border-radius:10px; margin-bottom:12px;" alt="題目圖片">`;
+            }
 
-    // 2. 影片題渲染（強制靜音）
-    if (q.video_url) {
-        html += `
-            <video id="quiz-video" src="${q.video_url}" autoplay muted playsinline 
-                   style="width:100%; max-height:200px; border-radius:10px; margin-bottom:12px; object-fit:cover;">
-            </video>
-        `;
-    }
+            // 2. 影片題渲染（強制靜音）
+            if (q.video_url) {
+                html += `
+                    <video id="quiz-video" src="${q.video_url}" autoplay muted playsinline 
+                           style="width:100%; max-height:200px; border-radius:10px; margin-bottom:12px; object-fit:cover;">
+                    </video>
+                `;
+            }
 
-    html += `<p style="font-size:15px; font-weight:bold; margin-bottom:15px; color:#fff;">${q.question}</p>`;
-    html += `<div id="options-box">`;
+            html += `<p style="font-size:15px; font-weight:bold; margin-bottom:15px; color:#fff;">${q.question}</p>`;
+            html += `<div id="options-box">`;
 
-    // 渲染選項
-    if (q.options) {
-        q.options.forEach(opt => {
-            html += `<button class="quiz-option" onclick="clickAnswer(this, '${opt}', '${q.answer}')">${opt}</button>`;
+            // 渲染選項
+            if (q.options) {
+                q.options.forEach(opt => {
+                    html += `<button class="quiz-option" onclick="clickAnswer(this, '${opt}', '${q.answer}')">${opt}</button>`;
+                });
+            }
+            html += `</div>`;
+
+            document.getElementById('quiz-box').innerHTML = html;
+
+            // 💡 判斷：如果是影片題，先禁用所有按鈕，等影片結束才解鎖並開始計時
+            const videoEl = document.getElementById('quiz-video');
+            if (videoEl) {
+                // 1. 禁用所有選項按鈕
+                const allBtns = document.querySelectorAll('.quiz-option');
+                allBtns.forEach(b => b.disabled = true);
+                
+                document.getElementById('timer-text').innerText = "🎥 觀看影片中...";
+
+                // 2. 影片播放結束時解鎖按鈕並開始倒數
+                videoEl.onended = () => {
+                    allBtns.forEach(b => b.disabled = false);
+                    startTimer(q.answer);
+                };
+
+                // 防呆：若影片載入失敗，3 秒後強制解鎖並開跑
+                videoEl.onerror = () => {
+                    allBtns.forEach(b => b.disabled = false);
+                    startTimer(q.answer);
+                };
+            } else {
+                // 文字題與圖片題：直接開始倒數
+                startTimer(q.answer);
+            }
         });
-    }
-    html += `</div>`;
-
-    document.getElementById('quiz-box').innerHTML = html;
-
-    // 💡 判斷：如果是影片題，先禁用所有按鈕，等影片結束才解鎖並開始計時
-    const videoEl = document.getElementById('quiz-video');
-    if (videoEl) {
-        // 1. 禁用所有選項按鈕
-        const allBtns = document.querySelectorAll('.quiz-option');
-        allBtns.forEach(b => b.disabled = true);
-        
-        document.getElementById('timer-text').innerText = "🎥 觀看影片中...";
-
-        // 2. 影片播放結束時解鎖按鈕並開始倒數
-        videoEl.onended = () => {
-            allBtns.forEach(b => b.disabled = false);
-            startTimer(q.answer);
-        };
-
-        // 防呆：若影片載入失敗，3 秒後強制解鎖並開跑
-        videoEl.onerror = () => {
-            allBtns.forEach(b => b.disabled = false);
-            startTimer(q.answer);
-        };
-    } else {
-        // 文字題與圖片題：直接開始倒數
-        startTimer(q.answer);
-    }
-});
 
         function startTimer(correctAnswer) {
             timeLeft = 10;
@@ -398,7 +403,7 @@ HTML_TEMPLATE = """
 
             setTimeout(() => {
                 socket.emit('submit_answer', {
-                    room: currentRoom,
+                    room: myRoom,
                     name: myName,
                     is_correct: isCorrect,
                     time_left: timeLeft
@@ -416,7 +421,7 @@ HTML_TEMPLATE = """
 
             setTimeout(() => {
                 socket.emit('submit_answer', {
-                    room: currentRoom,
+                    room: myRoom,
                     name: myName,
                     is_correct: false,
                     time_left: 0
@@ -425,21 +430,25 @@ HTML_TEMPLATE = """
         }
 
         // 💡 3. 遊戲結束時清除紀錄
-        socket.on('game_over', (data) => {
-            sessionStorage.removeItem('quiz_username');
-            sessionStorage.removeItem('quiz_bias');
-            clearInterval(timerInterval);
-            
-            let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終分數</h2>`;
-            data.leaderboard.forEach((p, idx) => {
-                html += `<div class="roster-item">
-                    第 ${idx + 1} 名: <b>${p.name}</b> (${p.bias}) <br>
-                    總得分: <span style="color:#ff2a75; font-weight:bold; font-size:16px;">${p.score}</span> 分
-                </div>`;
-            });
+socket.on('game_over', (data) => {
+    sessionStorage.removeItem('quiz_username');
+    sessionStorage.removeItem('quiz_bias');
+    clearInterval(timerInterval);
+    
+    // 1. 將標題改為「最終分數」
+    let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終分數</h2>`;
+    
+    // 2. 移除「第 X 名」，僅顯示玩家暱稱、本命與總得分
+    data.leaderboard.forEach((p) => {
+        html += `<div class="roster-item">
+            玩家: <b>${p.name}</b> (${p.bias}) <br>
+            總得分: <span style="color:#ff2a75; font-weight:bold; font-size:16px;">${p.score}</span> 分
+        </div>`;
+    });
 
-            html += `<button class="btn-submit" onclick="location.reload()" style="margin-top:20px;">🔄 再次挑戰</button>`;
-            document.getElementById('quiz-box').innerHTML = html;
+    html += `<button class="btn-submit" onclick="location.reload()" style="margin-top:20px;">🔄 再次挑戰</button>`;
+    document.getElementById('quiz-box').innerHTML = html;
+});
         });
     </script>
 </body>
@@ -452,7 +461,8 @@ def index():
 
 @socketio.on('join_room')
 def handle_join(data):
-    room = data['room']
+    # 💡 使用玩家當前的 Socket 連線 ID 作為個人專屬房間，實現完全獨立遊玩
+    room = request.sid
     name = data['name']
     bias = data['bias']
     join_room(room)
@@ -486,8 +496,8 @@ def handle_join(data):
             })
             return  # 結束流程，不更新大廳列表
 
-    # 4. 若還在大廳，正常更新大廳玩家列表
-    emit('room_updated', {"players": r['players']}, room=room)
+    # 4. 回傳個人專屬房間 ID 給前端並更新個人大廳
+    emit('room_assigned', {"room": room, "players": r['players']}, room=room)
 
 @socketio.on('start_game')
 def handle_start(data):
