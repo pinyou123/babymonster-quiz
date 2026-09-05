@@ -216,60 +216,75 @@ HTML_TEMPLATE = """
         }
 
         // 💡 1. 頁面載入時檢查是否有未完成的遊戲紀錄（重連機制）
-        window.addEventListener('DOMContentLoaded', () => {
-            initAutoplay();
-            
-            const savedName = sessionStorage.getItem('quiz_username');
-            const savedBias = sessionStorage.getItem('quiz_bias');
-            if (savedName) {
-                document.getElementById('username').value = savedName;
-                myName = savedName;
-                if (savedBias) {
-                    const biasRadio = document.querySelector(`input[name="bias"][value="${savedBias}"]`);
-                    if (biasRadio) biasRadio.checked = true;
-                }
-                socket.emit('join_room', { name: savedName, bias: savedBias || 'Ruka' });
-            }
+window.addEventListener('DOMContentLoaded', () => {
+    initAutoplay();
+    
+    const savedName = sessionStorage.getItem('quiz_username');
+    const savedBias = sessionStorage.getItem('quiz_bias');
+    if (savedName) {
+        document.getElementById('username').value = savedName;
+        myName = savedName;
+        if (savedBias) {
+            const biasRadio = document.querySelector(`input[name="bias"][value="${savedBias}"]`);
+            if (biasRadio) biasRadio.checked = true;
+        }
+        socket.emit('join_room', { name: savedName, bias: savedBias || 'Ruka' });
+    }
+});
+
+function toggleMusic(e) {
+    if (e) e.stopPropagation();
+    const bgm = document.getElementById('lobby-bgm');
+    const btn = document.getElementById('bgm-toggle-btn');
+    if (!bgm) return;
+
+    if (bgm.paused) {
+        bgm.volume = 0.4;
+        bgm.play().then(() => {
+            isMusicPlaying = true;
+            if (btn) btn.innerText = "🎵 音樂: ON";
         });
+    } else {
+        bgm.pause();
+        isMusicPlaying = false;
+        if (btn) btn.innerText = "🔇 音樂: OFF";
+    }
+}
 
-        function toggleMusic(e) {
-            if (e) e.stopPropagation();
-            const bgm = document.getElementById('lobby-bgm');
-            const btn = document.getElementById('bgm-toggle-btn');
-            if (!bgm) return;
+// 💡 2. 玩家登入並儲存資料到 Session
+function joinGame() {
+    myName = document.getElementById('username').value.trim();
+    const biasEl = document.querySelector('input[name="bias"]:checked');
+    const bias = biasEl ? biasEl.value : 'Ruka';
 
-            if (bgm.paused) {
-                bgm.volume = 0.4;
-                bgm.play().then(() => {
-                    isMusicPlaying = true;
-                    if (btn) btn.innerText = "🎵 音樂: ON";
-                });
-            } else {
-                bgm.pause();
-                isMusicPlaying = false;
-                if (btn) btn.innerText = "🔇 音樂: OFF";
-            }
-        }
+    if (!myName) return alert("請輸入暱稱！");
 
-        // 💡 2. 玩家登入並儲存資料到 Session
-        function joinGame() {
-            myName = document.getElementById('username').value.trim();
-            const biasEl = document.querySelector('input[name="bias"]:checked');
-            const bias = biasEl ? biasEl.value : 'Ruka';
+    sessionStorage.setItem('quiz_username', myName);
+    sessionStorage.setItem('quiz_bias', bias);
 
-            if (!myName) return alert("請輸入暱稱！");
+    const bgm = document.getElementById('lobby-bgm');
+    if (bgm && isMusicPlaying && bgm.paused) {
+        bgm.volume = 0.4;
+        bgm.play().catch(err => console.log("音樂播放受限:", err));
+    }
 
-            sessionStorage.setItem('quiz_username', myName);
-            sessionStorage.setItem('quiz_bias', bias);
+    socket.emit('join_room', { name: myName, bias: bias });
+}
 
-            const bgm = document.getElementById('lobby-bgm');
-            if (bgm && isMusicPlaying && bgm.paused) {
-                bgm.volume = 0.4;
-                bgm.play().catch(err => console.log("音樂播放受限:", err));
-            }
+// 💡 3. 核心修復：接收專屬房間號，並將畫面切換至大廳（解決卡住問題）
+socket.on('room_assigned', (data) => {
+    myRoom = data.room; // 保存後端發配的個人獨立房間號
+    document.getElementById('setup-view').classList.add('hidden');
+    document.getElementById('lobby-view').classList.remove('hidden');
 
-            socket.emit('join_room', { name: myName, bias: bias });
-        }
+    let html = "<h4 style='color:#ffffff; margin-bottom:10px; font-size:14px;'>大廳玩家:</h4>";
+    data.players.forEach(p => { 
+        html += `<div class="roster-item">
+            👤 <b>${p.name}</b> - <span style="color:#cbd5e1;">本命:</span> <span style="color:#ff758c; font-weight:bold;">${p.bias}</span>
+        </div>`; 
+    });
+    document.getElementById('player-list').innerHTML = html;
+});
 
         // 💡 接收後端發配的個人獨立房間，並渲染個人大廳
         socket.on('room_assigned', (data) => {
