@@ -57,11 +57,13 @@ HTML_TEMPLATE = """
             background: rgba(13, 15, 23, 0.55); z-index: -1;
         }
 
+        /* 💡 調整為彈性寬度 90%，留出防裁切邊距 */
         .container {
-            width: 100%; max-width: 420px;
+            width: 90%; max-width: 420px;
             background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 42, 117, 0.5); border-radius: 20px;
             padding: 25px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); z-index: 1;
+            margin: auto;
         }
 
         .title {
@@ -133,6 +135,14 @@ HTML_TEMPLATE = """
             cursor: pointer;
             z-index: 999;
             box-shadow: 0 0 10px rgba(255, 42, 117, 0.4);
+        }
+
+        /* 📱 手機版專屬響應式規則（螢幕小於 768px 自動生效） */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .bg-grid { grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
+            .container { width: 95%; padding: 18px 14px; }
+            .music-btn { top: 10px; right: 10px; padding: 6px 10px; font-size: 12px; }
         }
     </style>
 </head>
@@ -289,7 +299,8 @@ HTML_TEMPLATE = """
     function startGame() {
         socket.emit('start_game', { room: myRoom });
     }
-// 💡 4. 接收新題目
+
+    // 💡 4. 接收新題目
     socket.on('new_question', (data) => {
         document.getElementById('setup-view').classList.add('hidden');
         document.getElementById('lobby-view').classList.add('hidden');
@@ -373,7 +384,7 @@ HTML_TEMPLATE = """
         }, 100);
     }
 
-    // 💡 點擊選項（不顯示真正的正確答案）
+    // 💡 點擊選項（不顯示真正的正確答案，防刷題）
     function clickAnswer(btn, selected, correct) {
         if (hasAnswered) return;
         hasAnswered = true;
@@ -384,7 +395,6 @@ HTML_TEMPLATE = """
 
         const isCorrect = (selected === correct);
 
-        // 💡 答對變綠，答錯只讓點選的按鈕變紅，不顯示正確答案
         if (isCorrect) {
             btn.classList.add('correct');
         } else {
@@ -401,7 +411,7 @@ HTML_TEMPLATE = """
         }, 1200);
     }
 
-    // 💡 超時未答（僅鎖定按鈕，不顯示正確答案）
+    // 💡 超時未答（不顯示正確答案）
     function timeOutAnswer(correct) {
         hasAnswered = true;
         const allBtns = document.querySelectorAll('.quiz-option');

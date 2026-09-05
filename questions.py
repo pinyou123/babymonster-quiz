@@ -136,7 +136,7 @@ QUESTION2 = [
     
     {"id": 11, 
      "question": "以下哪首歌曲跟其他歌曲是不同張專輯的？",
-     "options": ["WIID","STUCK IN THE MIDDLE", "SHEESH", "LIKE THAT"],
+     "options": ["WILD","STUCK IN THE MIDDLE", "SHEESH", "LIKE THAT"],
      "answer": "WILD"},
     
 
