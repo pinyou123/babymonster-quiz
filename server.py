@@ -12,7 +12,7 @@ from questions import QUESTION1, QUESTION2, QUESTION3, QUESTION_PICTURE, QUESTIO
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'babymonster_quiz_2026'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent", transports=['websocket'])
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 
 ROOMS = {}
@@ -186,7 +186,7 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
-        const socket = io({ transports: ['websocket'] });
+        const socket = io();
         let myName = "";
         let currentRoom = "global_room";
         let timerInterval = null;
@@ -430,7 +430,7 @@ HTML_TEMPLATE = """
             sessionStorage.removeItem('quiz_bias');
             clearInterval(timerInterval);
             
-            let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終排行榜</h2>`;
+            let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終分數</h2>`;
             data.leaderboard.forEach((p, idx) => {
                 html += `<div class="roster-item">
                     第 ${idx + 1} 名: <b>${p.name}</b> (${p.bias}) <br>
