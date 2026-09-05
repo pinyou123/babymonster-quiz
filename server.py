@@ -295,6 +295,12 @@ HTML_TEMPLATE = """
         });
         document.getElementById('player-list').innerHTML = html;
     });
+    
+    // 💡 補上遺漏的 startGame 函式（發送開始遊戲訊號）
+    function startGame() {
+        if (!myRoom && myName) myRoom = "user_" + myName;
+        socket.emit('start_game', { room: myRoom });
+    }
 
     // 💡 4. 接收新題目（防刷新關鍵：如果 myRoom 是空的，自動從暱稱重新綁定）
     socket.on('new_question', (data) => {
@@ -430,22 +436,29 @@ HTML_TEMPLATE = """
     }
 
     // 💡 5. 遊戲結束顯示最終分數
-    socket.on('game_over', (data) => {
-        sessionStorage.removeItem('quiz_username');
-        sessionStorage.removeItem('quiz_bias');
-        clearInterval(timerInterval);
-        
-        let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終分數</h2>`;
-        data.leaderboard.forEach((p) => {
-            html += `<div class="roster-item">
-                玩家: <b>${p.name}</b> (${p.bias}) <br>
-                總得分: <span style="color:#ff2a75; font-weight:bold; font-size:16px;">${p.score}</span> 分
-            </div>`;
-        });
-
-        html += `<button class="btn-submit" onclick="location.reload()" style="margin-top:20px;">🔄 再次挑戰</button>`;
-        document.getElementById('quiz-box').innerHTML = html;
+socket.on('game_over', (data) => {
+    sessionStorage.removeItem('quiz_username');
+    sessionStorage.removeItem('quiz_bias');
+    clearInterval(timerInterval);
+    
+    let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終分數</h2>`;
+    data.leaderboard.forEach((p) => {
+        html += `<div class="roster-item">
+            玩家: <b>${p.name}</b> (${p.bias}) <br>
+            總得分: <span style="color:#ff2a75; font-weight:bold; font-size:16px;">${p.score}</span> 分
+        </div>`;
     });
+
+    // 💡 1. 將 location.reload() 改為 restartGame()
+    html += `<button class="btn-submit" onclick="restartGame()" style="margin-top:20px;">🔄 再次挑戰</button>`;
+    document.getElementById('quiz-box').innerHTML = html;
+});
+
+// 新增這個函式，徹底清空快取再刷頁面
+function restartGame() {
+    sessionStorage.clear();
+    location.reload();
+}
 </script>
 </body>
 </html>
@@ -498,7 +511,15 @@ def handle_join(data):
 
 @socketio.on('start_game')
 def handle_start(data):
-    room = data['room']
+    # 💡 1. 改用 .get() 避免前端沒傳 room 時 KeyErrer 報錯
+    room = data.get('room')
+    
+    # 💡 2. 防呆修復：若 room 是空的或不在 ROOMS 中，自動搜尋對應的專屬房間
+    if not room or room not in ROOMS:
+        for r_id in ROOMS:
+            room = r_id
+            break
+
     if room in ROOMS:
         r = ROOMS[room]
         r['status'] = "PLAYING"
