@@ -121,11 +121,17 @@ HTML_TEMPLATE = """
             height: 100%; width: 100%; background: #ff2a75; transition: width 0.1s linear;
         }
         
-        .music-btn {
+        /* 💡 右上角音樂按鈕容器組 */
+        .music-controls {
             position: fixed;
             top: 15px;
             right: 15px;
-            background: rgba(15, 23, 42, 0.8);
+            display: flex;
+            gap: 6px;
+            z-index: 999;
+        }
+        .music-btn, .music-select {
+            background: rgba(15, 23, 42, 0.85);
             border: 1px solid #ff2a75;
             color: #fff;
             padding: 8px 12px;
@@ -133,8 +139,50 @@ HTML_TEMPLATE = """
             font-size: 13px;
             font-weight: bold;
             cursor: pointer;
-            z-index: 999;
             box-shadow: 0 0 10px rgba(255, 42, 117, 0.4);
+            outline: none;
+        }
+        .music-select option {
+            background: #0f172a;
+            color: #fff;
+        }
+
+        /* 💡 遊戲說明按鈕樣式 */
+        .btn-info {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        /* 💡 遊戲說明彈窗遮罩與視窗 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; padding: 20px;
+        }
+        .modal-content {
+            background: #0f172a;
+            border: 1px solid #ff2a75;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 380px;
+            width: 100%;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(255, 42, 117, 0.5);
+        }
+        .rules-body p {
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+            color: #cbd5e1;
         }
 
         /* 📱 手機版專屬響應式規則（螢幕小於 768px 自動生效） */
@@ -142,17 +190,29 @@ HTML_TEMPLATE = """
             body { padding: 10px; }
             .bg-grid { grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
             .container { width: 95%; padding: 18px 14px; }
-            .music-btn { top: 10px; right: 10px; padding: 6px 10px; font-size: 12px; }
+            .music-controls { top: 10px; right: 10px; }
+            .music-btn, .music-select { padding: 6px 10px; font-size: 12px; }
         }
     </style>
 </head>
 <body>
     <audio id="lobby-bgm" loop preload="auto">
-        <source src="{{ url_for('static', filename='bgm.mp3') }}" type="audio/mpeg">
+        <source id="bgm-source" src="{{ url_for('static', filename='bgm.mp3') }}" type="audio/mpeg">
     </audio>
 
-    <!-- 右上角音樂按鈕 -->
-    <button id="bgm-toggle-btn" class="music-btn" onclick="toggleMusic(event)">🎵 音樂: ON</button>
+    <!-- 右上角音樂控制區：選單 + 開關按鈕 -->
+    <div class="music-controls">
+        <select id="bgm-select" class="music-select" onchange="selectTrack(this.value)">
+            <option value="{{ url_for('static', filename='bgm.mp3') }}">🎵 I LIKE IT</option>
+            <option value="{{ url_for('static', filename='bgm2.mp3') }}">🎵 LIKE THAT</option>
+            <option value="{{ url_for('static', filename='bgm3.mp3') }}">🎵 DRIP</option>
+            <option value="{{ url_for('static', filename='bgm4.mp3') }}">🎵 FOREVER</option>
+            <option value="{{ url_for('static', filename='bgm5.mp3') }}">🎵 REALLY LIKE YOU</option>
+            <option value="{{ url_for('static', filename='bgm6.mp3') }}">🎵 SUPA DUPA LUV</option>
+            <option value="{{ url_for('static', filename='bgm7.mp3') }}">🎵 LOVE IN MY HEART</option>
+        </select>
+        <button id="bgm-toggle-btn" class="music-btn" onclick="toggleMusic(event)">🎵 音樂: ON</button>
+    </div>
     <div class="bg-grid">
         <div class="bg-img1"></div><div class="bg-img2"></div>
         <div class="bg-img3"></div><div class="bg-img4"></div>
@@ -183,6 +243,7 @@ HTML_TEMPLATE = """
             </div>
 
             <button class="btn-submit" onclick="joinGame()">🎮 準備進入大廳</button>
+            <button class="btn-info" onclick="openRulesModal()">📖 遊戲說明</button>
         </div>
 
         <!-- 2. 大廳視窗 -->
@@ -197,6 +258,20 @@ HTML_TEMPLATE = """
             <div id="quiz-box"></div>
         </div>
     </div>
+    
+    <!-- 💡 請把遊戲說明彈窗 Modal 直接塞在這裡（.container 外面、<script> 上面） -->
+    <div id="rules-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 style="color:#ff2a75; margin-bottom:15px; text-align:center;">📜 遊戲規則說明</h2>
+            <div class="rules-body">
+                <p><b>1. 答題時間：</b>每題有 10 秒倒數時間（影片題會先播放完畢才開始倒數）。</p>
+                <p><b>2. 計分方式：</b>答對獲得題目基礎分 + 剩餘時間加分；答錯不倒扣。</p>
+                <p><b>3. 題型種類：</b>包含文字題、圖片題以及影片題，考驗你對 BABYMONSTER 的熟悉度！</p>
+                <p><b>4. 防刷機制：</b>遊戲中途重載將繼續回答當前題目，且不顯示正確答案選項。</p>
+            </div>
+            <button class="btn-submit" onclick="closeRulesModal()" style="margin-top:15px;">返回主頁</button>
+        </div>
+    </div>
 
    <script>
     const socket = io();
@@ -207,7 +282,32 @@ HTML_TEMPLATE = """
     let hasAnswered = false;
     let isMusicPlaying = true;
 
-    // 💡 自動播放核心監聽
+    // 💡 1. 遊戲說明彈窗開關函式
+    function openRulesModal() {
+        document.getElementById('rules-modal').classList.remove('hidden');
+    }
+
+    function closeRulesModal() {
+        document.getElementById('rules-modal').classList.add('hidden');
+    }
+
+    // 💡 2. 下拉選單切換歌曲邏輯
+    function selectTrack(srcUrl) {
+        const bgm = document.getElementById('lobby-bgm');
+        const btn = document.getElementById('bgm-toggle-btn');
+        if (!bgm) return;
+
+        bgm.src = srcUrl;
+
+        if (isMusicPlaying) {
+            bgm.volume = 0.4;
+            bgm.play().then(() => {
+                if (btn) btn.innerText = "🎵 音樂: ON";
+            }).catch(err => console.log("音樂播放受限:", err));
+        }
+    }
+
+    // 💡 3. 自動播放核心監聽
     function initAutoplay() {
         const startMusicOnFirstClick = () => {
             const bgm = document.getElementById('lobby-bgm');
@@ -470,8 +570,8 @@ def index():
 
 @socketio.on('join_room')
 def handle_join(data):
-    name = data['name'].strip()
-    bias = data['bias']
+    name = data.get('name', '').strip()
+    bias = data.get('bias', 'Ruka')
     
     # 💡 核心修改：使用「暱稱」當作房間 ID（防刷新關閉）
     room = f"user_{name}"
@@ -577,8 +677,8 @@ def send_question(room):
 
 @socketio.on('submit_answer')
 def handle_answer(data):
-    room = data['room']
-    name = data['name']
+    room = data.get('room')
+    name = data.get('name')
     is_correct = data.get('is_correct', False)
     time_left = data.get('time_left', 0)
     
