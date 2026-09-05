@@ -120,7 +120,7 @@ QUESTION2 = [
     "answer": "遊戲機"},
     
     {"id":73,
-    "question": "ASA寶怪屋中房間跟誰是室友？",
+    "question": "ASA 在寶怪屋中房間跟誰是室友？",
     "options": ["PHARITA","RORA","RUKA","AHYEON"],
     "answer": "PHARITA"},
     
@@ -273,7 +273,7 @@ QUESTION_PICTURE = [
     
     {
         "id": 8,
-        "question": "Canny當時玩把真心話時，是對哪位團員說？",
+        "question": "Canny當時玩真心話時，是對哪位團員說？",
         "image_url": "/static/canny1.jpg",
         "options": ["RORA", "AHYEON", "PHARITA", "ASA"],
         "answer": "RORA"
