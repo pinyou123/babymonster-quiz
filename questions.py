@@ -422,7 +422,7 @@ QUESTION_VIDEO = [
     "muted": False },
     
     {"id": 8,
-    "question": "當時 CHIQUITA 跟 Canny在幹嘛？",
+    "question": "當時 CHIQUITA 跟 RORA 在幹嘛？",
     "options": ["吵架", "說笑話", "Freestyle", "唱情歌"],
     "answer": "Freestyle",
     "video_url": "/static/babymo8.mp4",
