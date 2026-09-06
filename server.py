@@ -137,9 +137,12 @@ HTML_TEMPLATE = """
         /* 💡 右上角音樂按鈕容器組 */
         .music-controls {
             position: fixed;
-            top: 15px;
-            right: 15px;
+            top: 10px;
+            right: 10px;
+            left: 10px;
             display: flex;
+            justify-content: flex-end;
+            flex-wrap: wrap;
             gap: 6px;
             z-index: 999;
         }
@@ -198,13 +201,32 @@ HTML_TEMPLATE = """
             color: #cbd5e1;
         }
 
-        /* 📱 手機版專屬響應式規則（螢幕小於 768px 自動生效） */
+        /* 📱 手機版專屬響應式規則 */
         @media (max-width: 768px) {
-            body { padding: 10px; }
+            body { 
+                padding: 10px; 
+                padding-top: 75px; /* 💡 關鍵：增加上方留白，避免標題被按鈕擋住 */
+            }
             .bg-grid { grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
-            .container { width: 95%; padding: 18px 14px; }
-            .music-controls { top: 10px; right: 10px; }
-            .music-btn, .music-select { padding: 6px 10px; font-size: 12px; }
+            .container { 
+                width: 95%; 
+                padding: 18px 14px; 
+                margin-top: 10px;
+            }
+            .music-controls { 
+                top: 8px; 
+                right: 8px; 
+                left: 8px;
+                justify-content: center; /* 💡 手機版按鈕水平置中，防止右側擠壓 */
+            }
+            .music-btn, .music-select { 
+                padding: 5px 8px; 
+                font-size: 11px; /* 💡 微調字體大小與內邊距，節省空間 */
+            }
+            .title {
+                font-size: 20px; /* 💡 稍微縮小手機版標題，避免佔用太多空間 */
+                margin-bottom: 15px;
+            }
         }
         
         .developer-footer {
