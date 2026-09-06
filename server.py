@@ -1,6 +1,8 @@
 import sys
 import random
 import copy
+import json
+import os
 from gevent import monkey
 
 import uuid
@@ -20,6 +22,16 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 ROOMS = {}
 GLOBAL_LEADERBOARD = []  # 儲存所有玩家的歷史紀錄
+LEADERBOARD_FILE = "leaderboard.json"
+
+# 💡 伺服器啟動時自動嘗試讀取舊有紀錄
+if os.path.exists(LEADERBOARD_FILE):
+    try:
+        with open(LEADERBOARD_FILE, "r", encoding="utf-8") as f:
+            GLOBAL_LEADERBOARD = json.load(f)
+            print(f"✅ 成功載入 {len(GLOBAL_LEADERBOARD)} 筆歷史排行榜紀錄！")
+    except Exception as e:
+        print(f"⚠️ 讀取排行榜檔案失敗: {e}")
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -810,12 +822,21 @@ def send_question(room):
         # 1. 將本局玩家寫入全域排行榜
         for p in r['players']:
             GLOBAL_LEADERBOARD.append(copy.deepcopy(p))
-        # 2. 印出所有歷史玩家紀錄（包含年齡）至後台控制台 Log
+            
+        # 💡 2. 自動寫入 JSON 檔案（確保伺服器重啟或重新部署時資料不丟失）
+        try:
+            with open(LEADERBOARD_FILE, "w", encoding="utf-8") as f:
+                json.dump(GLOBAL_LEADERBOARD, f, ensure_ascii=False, indent=2)
+            print("💾 排行榜資料已成功儲存至 leaderboard.json！")
+        except Exception as e:
+            print(f"⚠️ 儲存排行榜檔案失敗: {e}")
+
+        # 3. 印出所有歷史玩家紀錄（包含年齡）至後台控制台 Log
         print("=== 當前所有玩家紀錄 ===")
         for p in GLOBAL_LEADERBOARD:
             print(f"姓名: {p['name']}, 年齡: {p.get('age', '未提供')}, 本命: {p['bias']}, 答對: {p.get('correct_count', 0)}, 得分: {p['score']}")
 
-        # 3. 依照分數排序全域榜單，取前 30 名發給前端
+        # 4. 依照分數排序全域榜單，取前 30 名發給前端
         sorted_global = sorted(GLOBAL_LEADERBOARD, key=lambda x: x['score'], reverse=True)
         top_30 = sorted_global[:30]
         
