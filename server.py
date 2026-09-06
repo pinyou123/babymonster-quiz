@@ -549,11 +549,11 @@ HTML_TEMPLATE = """
         let html = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="color:#ff2a75; font-weight:bold;">第 ${data.index + 1} / ${data.total} 題${scoreText}</span>
-                <span id="timer-text" style="color:#fff; font-weight:bold;">⏱️ 10 秒</span>
+                <span id="timer-text" style="color:#ff758c; font-weight:bold;">📖 閱讀題目中...</span>
             </div>
-            <div class="timer-container"><div id="timer-bar" class="timer-bar"></div></div>
+            <div class="timer-container"><div id="timer-bar" class="timer-bar" style="width: 100%; background: #ff758c;"></div></div>
         `;
-
+        
         if (q.image_url) {
             html += `<img src="${q.image_url}" class="quiz-image" style="width:100%; max-height:180px; object-fit:cover; border-radius:10px; margin-bottom:12px;" alt="題目圖片">`;
         }
@@ -595,9 +595,10 @@ HTML_TEMPLATE = """
                 startTimer(q.answer);
             };
         } else {
-            // 💡 文字與圖片題：先顯示提示並停頓 1 秒閱讀題目，再開始 10 秒倒數
-            document.getElementById('timer-text').innerText = "📖 閱讀題目中...";
+            // 💡 停頓 1 秒期間保持粉紅色提示，1 秒過後恢復桃紅色並啟動倒數
             setTimeout(() => {
+                const bar = document.getElementById('timer-bar');
+                if (bar) bar.style.background = '#ff2a75';
                 startTimer(q.answer);
             }, 1000);
         }
