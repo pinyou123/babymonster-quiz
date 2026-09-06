@@ -249,8 +249,9 @@ HTML_TEMPLATE = """
         <source id="bgm-source" src="{{ url_for('static', filename='bgm.mp3') }}" type="audio/mpeg">
     </audio>
 
-    <!-- 右上角音樂控制區：選單 + 開關按鈕 -->
+    <!-- 右上角音樂控制區：彩蛋按鈕 + 選單 + 開關按鈕 -->
     <div class="music-controls">
+        <button class="music-btn" onclick="openBangModal()">🎬 點一下看看</button>
         <select id="bgm-select" class="music-select" onchange="selectTrack(this.value)">
             <option value="{{ url_for('static', filename='bgm.mp3') }}">🎵 I LIKE IT</option>
             <option value="{{ url_for('static', filename='bgm2.mp3') }}">🎵 LIKE THAT</option>
@@ -316,8 +317,8 @@ HTML_TEMPLATE = """
         
         <!-- 💡 請把開發者資訊貼在這裡 -->
         <div class="developer-footer">
-            開發者：<b>Pinyou Liu</b><br>
-            IG / Threads：@pinyou890201
+            BABYMONSTER 官方：IG @babymonster_ygofficial / YT BABYMONSTER<br>
+            開發者：<b>Pinyou Liu</b>（IG / Threads：@pinyou890201）
         </div>
 
     </div>
@@ -338,7 +339,7 @@ HTML_TEMPLATE = """
     <!-- 💡 排行榜彈窗 -->
     <div id="leaderboard-modal" class="modal-overlay hidden">
         <div class="modal-content" style="max-width: 450px;">
-            <h2 style="color:#ff2a75; margin-bottom:15px; text-align:center;">🏆 全球英雄榜 (TOP 30)</h2>
+            <h2 style="color:#ff2a75; margin-bottom:15px; text-align:center;">🏆 排行榜 (TOP 30)</h2>
             <div style="max-height: 300px; overflow-y: auto;">
                 <table class="leaderboard-table">
                     <thead>
@@ -356,6 +357,17 @@ HTML_TEMPLATE = """
                 </table>
             </div>
             <button class="btn-submit" onclick="closeLeaderboardModal()" style="margin-top:15px;">返回主頁</button>
+        </div>
+    </div>
+    
+    <!-- 💡 請貼在這裡（彩蛋影片彈窗） -->
+    <div id="bang-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 420px; position: relative; padding: 15px;">
+            <button onclick="closeBangModal()" style="position: absolute; top: 8px; right: 12px; background: none; border: none; color: #ff2a75; font-size: 24px; font-weight: bold; cursor: pointer; z-index: 10;">✖</button>
+            <video id="bang-video" style="width: 100%; border-radius: 10px; margin-top: 15px;" controls playsinline>
+                <source src="{{ url_for('static', filename='bang.mp4') }}" type="video/mp4">
+                您的瀏覽器不支援影片播放。
+            </video>
         </div>
     </div>
 
@@ -385,6 +397,45 @@ HTML_TEMPLATE = """
 
     function closeLeaderboardModal() {
         document.getElementById('leaderboard-modal').classList.add('hidden');
+    }
+    
+    // 💡 請貼在這裡（彩蛋影片彈窗開關控制）
+    function openBangModal() {
+        const bgm = document.getElementById('lobby-bgm');
+        const bangVideo = document.getElementById('bang-video');
+        
+        // 1. 暫停 BGM
+        if (bgm && !bgm.paused) {
+            bgm.pause();
+        }
+        
+        // 2. 顯示 Modal 並從頭播放影片
+        document.getElementById('bang-modal').classList.remove('hidden');
+        if (bangVideo) {
+            bangVideo.currentTime = 0;
+            bangVideo.play().catch(err => console.log("影片自動播放受限:", err));
+            
+            // 💡 影片播放結束時自動關閉並繼續背景音樂
+            bangVideo.onended = closeBangModal;
+        }
+    }
+
+    function closeBangModal() {
+        const bgm = document.getElementById('lobby-bgm');
+        const bangVideo = document.getElementById('bang-video');
+        
+        // 1. 暫停影片
+        if (bangVideo) {
+            bangVideo.pause();
+        }
+        
+        // 2. 隱藏 Modal
+        document.getElementById('bang-modal').classList.add('hidden');
+        
+        // 3. 恢復 BGM 續播（從剛才斷掉的地方繼續）
+        if (bgm && isMusicPlaying) {
+            bgm.play().catch(err => console.log("背景音樂恢復受限:", err));
+        }
     }
 
     // 接收並渲染主頁排行榜 Modal 資料
@@ -686,7 +737,7 @@ socket.on('game_over', (data) => {
     }
 
     // 💡 2. 結算畫面直接嵌入 TOP 30 排行榜表格
-    html += `<h4 style="color:#fff; margin-bottom:8px; text-align:center;">📊 全球排行榜 TOP 30</h4>`;
+    html += `<h4 style="color:#fff; margin-bottom:8px; text-align:center;">📊 排行榜 TOP 30</h4>`;
     html += `<div style="max-height: 220px; overflow-y: auto;">
         <table class="leaderboard-table">
             <thead>
