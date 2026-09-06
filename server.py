@@ -339,7 +339,7 @@ HTML_TEMPLATE = """
         
         <!-- 💡 請把開發者資訊貼在這裡 -->
         <div class="developer-footer">
-            BABYMONSTER 官方：IG @babymonster_ygofficial / YT BABYMONSTER<br>
+            BABYMONSTER 官方：IG :@babymonster_ygofficial / YT :BABYMONSTER<br>
             開發者：<b>Pinyou Liu</b>（IG / Threads：@pinyou890201）
         </div>
 
@@ -353,6 +353,7 @@ HTML_TEMPLATE = """
                 <p><b>1. 答題時間：</b>每題有 10 秒倒數時間（影片題會先播放完畢才開始倒數且才能點選選項）。</p>
                 <p><b>2. 計分方式：</b>答對獲得題目基礎分 + 剩餘時間加分；答錯不倒扣。</p>
                 <p><b>3. 題型種類：</b>包含文字題、圖片題以及影片題。</p>
+                <p>本遊戲無任何商業用途，素材全源於 BABYMONSTER 官方。</p>
             </div>
             <button class="btn-submit" onclick="closeRulesModal()" style="margin-top:15px;">返回主頁</button>
         </div>
@@ -391,9 +392,26 @@ HTML_TEMPLATE = """
             </video>
         </div>
     </div>
-
+    
+    <!-- 💡 本命成員加油彈窗（純圖片） -->
+    <div id="cheer-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 380px; text-align: center; padding: 20px;">
+            <h3 id="cheer-title" style="color: #ff2a75; margin-bottom: 10px;">❤️ 本命的專屬加油</h3>
+            <img id="cheer-img" src="" alt="成員加油圖" style="width: 100%; border-radius: 12px; margin: 10px 0; max-height: 320px; object-fit: contain;">
+            <button class="btn-submit" onclick="showFinalScoreModal()" style="margin-top: 15px;">📊 查看最終分數</button>
+        </div>
+    </div>
+    
    <script>
     const socket = io();
+    function getTitleByScore(correctCount) {
+        if (correctCount >= 25) return "資深 MONSTIEZ";
+        if (correctCount >= 18) return "核心 MONSTIEZ";
+        if (correctCount >= 12) return "新晉 MONSTIEZ";
+        return "預備 MONSTIEZ";
+    }
+
+    let cachedGameOverData = null; // 用於暫存遊戲結束資料
     let myName = "";
     let myRoom = "";
     let timerInterval = null;
@@ -746,54 +764,75 @@ HTML_TEMPLATE = """
         }, 1200);
     }
 
-    // 💡 5. 遊戲結束顯示最終分數
-socket.on('game_over', (data) => {
-    sessionStorage.removeItem('quiz_username');
-    sessionStorage.removeItem('quiz_bias');
-    clearInterval(timerInterval);
-    
-    let myInfo = data.my_result ? data.my_result[0] : null;
-    let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:10px;">🏆 挑戰結束</h2>`;
-    
-    // 💡 1. 顯示玩家個人成績（包含答對題數與最終得分）
-    if (myInfo) {
-        html += `<div class="roster-item" style="text-align:center; margin-bottom:15px; padding: 12px;">
-            答對題數：<b style="color:#10b981; font-size:16px;">${myInfo.correct_count || 0}</b> 題<br>
-            最終得分：<span style="color:#ff2a75; font-weight:bold; font-size:20px;">${myInfo.score || 0}</span> 分
-        </div>`;
-    }
+    // 💡 5. 遊戲結束：先跳出本命加油圖片彈窗
+    socket.on('game_over', (data) => {
+        sessionStorage.removeItem('quiz_username');
+        sessionStorage.removeItem('quiz_bias');
+        clearInterval(timerInterval);
+        
+        cachedGameOverData = data; // 暫存資料給按下「查看最終分數」時使用
+        
+        let myInfo = data.my_result ? data.my_result[0] : null;
+        let member = (myInfo && myInfo.bias) ? myInfo.bias : "Ahyeon";
+        
+        // 載入自帶台詞的成員圖片 (例如 static/ruka_cheer.jpg)
+        document.getElementById('cheer-img').src = `/static/${member.toLowerCase()}_cheer.jpg`;
+        
+        // 開啟本命加油彈窗
+        document.getElementById('cheer-modal').classList.remove('hidden');
+    });
 
-    // 💡 2. 結算畫面直接嵌入 TOP 30 排行榜表格
-    html += `<h4 style="color:#fff; margin-bottom:8px; text-align:center;">📊 排行榜 TOP 30</h4>`;
-    html += `<div style="max-height: 220px; overflow-y: auto;">
-        <table class="leaderboard-table">
-            <thead>
-                <tr>
-                    <th>名次</th><th>名稱</th><th>本命</th><th>答對題數</th><th>分數</th>
-                </tr>
-            </thead>
-            <tbody>`;
+    // 💡 點擊「查看最終分數」按鈕後，顯示你原本寫好的完整結算畫面（加上粉絲稱號）
+    function showFinalScoreModal() {
+        document.getElementById('cheer-modal').classList.add('hidden');
+        
+        if (!cachedGameOverData) return;
+        let data = cachedGameOverData;
+        let myInfo = data.my_result ? data.my_result[0] : null;
+        let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:10px;">🏆 挑戰結束</h2>`;
+        
+        // 💡 保留你原本的個人成績顯示，僅在上方加入「粉絲稱號」
+        if (myInfo) {
+            let correct = myInfo.correct_count || 0;
+            let title = getTitleByScore(correct);
             
-    if (data.leaderboard && data.leaderboard.length > 0) {
-        data.leaderboard.forEach((p, index) => {
-            html += `<tr>
-                <td>${index + 1}</td>
-                <td><b>${p.name}</b></td>
-                <td>${p.bias}</td>
-                <td>${p.correct_count || 0} 題</td>
-                <td style="color:#ff2a75; font-weight:bold;">${p.score}</td>
-            </tr>`;
-        });
-    } else {
-        html += `<tr><td colspan="5">暫無紀錄</td></tr>`;
-    }
-    
-    html += `</tbody></table></div>`;
-    html += `<button class="btn-submit" onclick="restartGame()" style="margin-top:15px;">🔄 再次挑戰</button>`;
-    
-    document.getElementById('quiz-box').innerHTML = html;
-});
+            html += `<div class="roster-item" style="text-align:center; margin-bottom:15px; padding: 12px;">
+                粉絲稱號：<b style="color:#ff758c; font-size:17px;">${title}</b><br>
+                答對題數：<b style="color:#10b981; font-size:16px;">${correct}</b> 題<br>
+                最終得分：<span style="color:#ff2a75; font-weight:bold; font-size:20px;">${myInfo.score || 0}</span> 分
+            </div>`;
+        }
 
+        // 💡 完全保留你原本的 TOP 30 排行榜表格與樣式
+        html += `<h4 style="color:#fff; margin-bottom:8px; text-align:center;">📊 排行榜 TOP 30</h4>`;
+        html += `<div style="max-height: 220px; overflow-y: auto;">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>名次</th><th>名稱</th><th>本命</th><th>答對題數</th><th>分數</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+                
+        if (data.leaderboard && data.leaderboard.length > 0) {
+            data.leaderboard.forEach((p, index) => {
+                html += `<tr>
+                    <td>${index + 1}</td>
+                    <td><b>${p.name}</b></td>
+                    <td>${p.bias}</td>
+                    <td>${p.correct_count || 0} 題</td>
+                    <td style="color:#ff2a75; font-weight:bold;">${p.score}</td>
+                </tr>`;
+            });
+        } else {
+            html += `<tr><td colspan="5">暫無紀錄</td></tr>`;
+        }
+        
+        html += `</tbody></table></div>`;
+        html += `<button class="btn-submit" onclick="restartGame()" style="margin-top:15px;">🔄 再次挑戰</button>`;
+        
+        document.getElementById('quiz-box').innerHTML = html;
+    }
 // 💡 3. 保留你的 restartGame 函式
 function restartGame() {
     sessionStorage.clear();
