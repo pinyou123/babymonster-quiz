@@ -19,6 +19,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 
 ROOMS = {}
+GLOBAL_LEADERBOARD = []  # 儲存所有玩家的歷史紀錄
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -213,6 +214,22 @@ HTML_TEMPLATE = """
     color: #ff2a75;
     text-decoration: underline;
 }
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    color: #fff;
+    text-align: center;
+}
+.leaderboard-table th, .leaderboard-table td {
+    padding: 8px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.leaderboard-table th {
+    color: #ff2a75;
+    background: rgba(255, 42, 117, 0.1);
+}
     </style>
 </head>
 <body>
@@ -248,6 +265,12 @@ HTML_TEMPLATE = """
                 <label>你的暱稱</label>
                 <input type="text" id="username" placeholder="請輸入暱稱">
             </div>
+            
+            <!-- 💡 新增年齡輸入框 -->
+            <div class="form-group">
+                <label>你的年齡</label>
+                <input type="number" id="user-age" placeholder="請輸入年齡" min="1" max="99">
+            </div>
 
             <div class="form-group">
                 <label>你擔誰（本命成員）</label>
@@ -264,6 +287,7 @@ HTML_TEMPLATE = """
 
             <button class="btn-submit" onclick="joinGame()">🎮 準備進入大廳</button>
             <button class="btn-info" onclick="openRulesModal()">📖 遊戲說明</button>
+            <button class="btn-info" onclick="openLeaderboardModal()" style="margin-top: 8px;">🏆 排行榜</button>
         </div>
 
         <!-- 2. 大廳視窗 -->
@@ -298,6 +322,30 @@ HTML_TEMPLATE = """
             <button class="btn-submit" onclick="closeRulesModal()" style="margin-top:15px;">返回主頁</button>
         </div>
     </div>
+    
+    <!-- 💡 排行榜彈窗 -->
+    <div id="leaderboard-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 450px;">
+            <h2 style="color:#ff2a75; margin-bottom:15px; text-align:center;">🏆 全球英雄榜 (TOP 30)</h2>
+            <div style="max-height: 300px; overflow-y: auto;">
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>名次</th>
+                            <th>名稱</th>
+                            <th>本命</th>
+                            <th>答對題數</th>
+                            <th>分數</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-body">
+                        <!-- 動態插入排行榜 -->
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn-submit" onclick="closeLeaderboardModal()" style="margin-top:15px;">返回主頁</button>
+        </div>
+    </div>
 
    <script>
     const socket = io();
@@ -316,6 +364,35 @@ HTML_TEMPLATE = """
     function closeRulesModal() {
         document.getElementById('rules-modal').classList.add('hidden');
     }
+
+    // 💡 1-1. 新增排行榜彈窗開關與資料接收函式
+    function openLeaderboardModal() {
+        socket.emit('get_leaderboard');
+        document.getElementById('leaderboard-modal').classList.remove('hidden');
+    }
+
+    function closeLeaderboardModal() {
+        document.getElementById('leaderboard-modal').classList.add('hidden');
+    }
+
+    // 接收並渲染主頁排行榜 Modal 資料
+    socket.on('update_leaderboard', (data) => {
+        let html = "";
+        if (data.leaderboard && data.leaderboard.length > 0) {
+            data.leaderboard.forEach((p, index) => {
+                html += `<tr>
+                    <td>${index + 1}</td>
+                    <td><b>${p.name}</b></td>
+                    <td>${p.bias}</td>
+                    <td>${p.correct_count || 0} 題</td>
+                    <td style="color:#ff2a75; font-weight:bold;">${p.score}</td>
+                </tr>`;
+            });
+        } else {
+            html = "<tr><td colspan='5'>暫無紀錄</td></tr>";
+        }
+        document.getElementById('leaderboard-body').innerHTML = html;
+    });
 
     // 💡 2. 下拉選單切換歌曲邏輯
     function selectTrack(srcUrl) {
@@ -357,14 +434,24 @@ HTML_TEMPLATE = """
         
         const savedName = sessionStorage.getItem('quiz_username');
         const savedBias = sessionStorage.getItem('quiz_bias');
+        const savedAge = sessionStorage.getItem('quiz_age') || '未提供'; // 💡 1. 讀取年齡快取
+
         if (savedName) {
             document.getElementById('username').value = savedName;
             myName = savedName;
+            
             if (savedBias) {
                 const biasRadio = document.querySelector(`input[name="bias"][value="${savedBias}"]`);
                 if (biasRadio) biasRadio.checked = true;
             }
-            socket.emit('join_room', { name: savedName, bias: savedBias || 'Ruka' });
+
+            // 💡 2. 若有暫存年齡，順便自動填入 input 欄位
+            if (savedAge !== '未提供') {
+                document.getElementById('user-age').value = savedAge;
+            }
+
+            // 💡 3. 將包含 age 的完整資料發送給後端
+            socket.emit('join_room', { name: savedName, bias: savedBias || 'Ruka', age: savedAge });
         }
     });
 
@@ -390,13 +477,16 @@ HTML_TEMPLATE = """
     // 💡 2. 玩家加入遊戲
     function joinGame() {
         myName = document.getElementById('username').value.trim();
+        const myAge = document.getElementById('user-age').value.trim();
         const biasEl = document.querySelector('input[name="bias"]:checked');
         const bias = biasEl ? biasEl.value : 'Ruka';
 
         if (!myName) return alert("請輸入暱稱！");
+        if (!myAge) return alert("請輸入年齡！");
 
         sessionStorage.setItem('quiz_username', myName);
         sessionStorage.setItem('quiz_bias', bias);
+        sessionStorage.setItem('quiz_age', myAge);
 
         const bgm = document.getElementById('lobby-bgm');
         if (bgm && isMusicPlaying && bgm.paused) {
@@ -404,7 +494,7 @@ HTML_TEMPLATE = """
             bgm.play().catch(err => console.log("音樂播放受限:", err));
         }
 
-        socket.emit('join_room', { name: myName, bias: bias });
+        socket.emit('join_room', { name: myName, bias: bias, age: myAge });
     }
 
     // 💡 3. 接收專屬房間號，並紀錄 myRoom
@@ -567,20 +657,49 @@ socket.on('game_over', (data) => {
     sessionStorage.removeItem('quiz_bias');
     clearInterval(timerInterval);
     
-    let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:15px;">🏆 最終分數</h2>`;
-    data.leaderboard.forEach((p) => {
-        html += `<div class="roster-item">
-            玩家: <b>${p.name}</b> (${p.bias}) <br>
-            總得分: <span style="color:#ff2a75; font-weight:bold; font-size:16px;">${p.score}</span> 分
+    let myInfo = data.my_result ? data.my_result[0] : null;
+    let html = `<h2 style="color:#ff2a75; text-align:center; margin-bottom:10px;">🏆 挑戰結束</h2>`;
+    
+    // 💡 1. 顯示玩家個人成績（包含答對題數與最終得分）
+    if (myInfo) {
+        html += `<div class="roster-item" style="text-align:center; margin-bottom:15px; padding: 12px;">
+            答對題數：<b style="color:#10b981; font-size:16px;">${myInfo.correct_count || 0}</b> 題<br>
+            最終得分：<span style="color:#ff2a75; font-weight:bold; font-size:20px;">${myInfo.score || 0}</span> 分
         </div>`;
-    });
+    }
 
-    // 💡 1. 將 location.reload() 改為 restartGame()
-    html += `<button class="btn-submit" onclick="restartGame()" style="margin-top:20px;">🔄 再次挑戰</button>`;
+    // 💡 2. 結算畫面直接嵌入 TOP 30 排行榜表格
+    html += `<h4 style="color:#fff; margin-bottom:8px; text-align:center;">📊 全球排行榜 TOP 30</h4>`;
+    html += `<div style="max-height: 220px; overflow-y: auto;">
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>名次</th><th>名稱</th><th>本命</th><th>答對題數</th><th>分數</th>
+                </tr>
+            </thead>
+            <tbody>`;
+            
+    if (data.leaderboard && data.leaderboard.length > 0) {
+        data.leaderboard.forEach((p, index) => {
+            html += `<tr>
+                <td>${index + 1}</td>
+                <td><b>${p.name}</b></td>
+                <td>${p.bias}</td>
+                <td>${p.correct_count || 0} 題</td>
+                <td style="color:#ff2a75; font-weight:bold;">${p.score}</td>
+            </tr>`;
+        });
+    } else {
+        html += `<tr><td colspan="5">暫無紀錄</td></tr>`;
+    }
+    
+    html += `</tbody></table></div>`;
+    html += `<button class="btn-submit" onclick="restartGame()" style="margin-top:15px;">🔄 再次挑戰</button>`;
+    
     document.getElementById('quiz-box').innerHTML = html;
 });
 
-// 新增這個函式，徹底清空快取再刷頁面
+// 💡 3. 保留你的 restartGame 函式
 function restartGame() {
     sessionStorage.clear();
     location.reload();
@@ -598,6 +717,7 @@ def index():
 def handle_join(data):
     name = data.get('name', '').strip()
     bias = data.get('bias', 'Ruka')
+    age = data.get('age', '未提供')  # 💡 接收年齡
     
     # 💡 核心修改：使用「暱稱」當作房間 ID（防刷新關閉）
     room = f"user_{name}"
@@ -617,11 +737,12 @@ def handle_join(data):
     # 2. 檢查玩家資料
     player = next((p for p in r['players'] if p['name'] == name), None)
     if not player:
-        r['players'].append({"name": name, "bias": bias, "score": 0})
+        # 💡 新增 age 與 correct_count (答對題數)
+        r['players'].append({"name": name, "bias": bias, "age": age, "score": 0, "correct_count": 0})
     else:
         player['bias'] = bias
+        player['age'] = age
 
-    # 💡 3. 防刷新：如果遊戲正在進行中，帶回當前題目
     if r['status'] == "PLAYING":
         q_idx = r['current_q']
         if q_idx < len(r['selected_questions']):
@@ -630,57 +751,44 @@ def handle_join(data):
                 "index": q_idx,
                 "total": len(r['selected_questions'])
             }, room=room)
-            return  # 成功留在遊戲內，不跳回大廳
+            return
 
-    # 4. 未在遊戲中則正常回傳房間並顯示大廳
     emit('room_assigned', {"room": room, "players": r['players']}, room=room)
 
 @socketio.on('start_game')
 def handle_start(data):
-    # 💡 1. 改用 .get() 避免前端沒傳 room 時 KeyErrer 報錯
     room = data.get('room')
     
-    # 💡 2. 防呆修復：若 room 是空的或不在 ROOMS 中，自動搜尋對應的專屬房間
-    if not room or room not in ROOMS:
-        for r_id in ROOMS:
-            room = r_id
-            break
-
-    if room in ROOMS:
+    if room and room in ROOMS:
         r = ROOMS[room]
         r['status'] = "PLAYING"
         r['current_q'] = 0
         
-        # 重置玩家分數
         for p in r['players']:
             p['score'] = 0
+            p['correct_count'] = 0
             
-        # 1. 從各類題庫隨機抽取指定數量（使用 min 避免題庫不足報錯）
         q1_sample = random.sample(QUESTION1, min(7, len(QUESTION1)))
         q2_sample = random.sample(QUESTION2, min(7, len(QUESTION2)))
         q3_sample = random.sample(QUESTION3, min(5, len(QUESTION3)))
         pic_sample = random.sample(QUESTION_PICTURE, min(7, len(QUESTION_PICTURE)))
         vid_sample = random.sample(QUESTION_VIDEO, min(4, len(QUESTION_VIDEO)))
 
-        # 深拷貝題目，避免打亂選項時修改到全域變數
+        # 💡 1. 拷貝前直接為各題型注入分數權重
+        for q in q1_sample: q['base_score'] = 100
+        for q in q2_sample: q['base_score'] = 150
+        for q in q3_sample: q['base_score'] = 200
+        for q in pic_sample: q['base_score'] = 150
+        for q in vid_sample: q['base_score'] = 150
+
+        # 💡 2. 將設定好分數的題目合併並進行深拷貝
         selected_raw = copy.deepcopy(q1_sample + q2_sample + q3_sample + pic_sample + vid_sample)
 
-        # 2. 為題目注入基礎分數權重 (Base Score)
+        # 💡 3. 打亂選項與題目順序
         for q in selected_raw:
-            if q in q1_sample:
-                q['base_score'] = 100  # 簡單文字題
-            elif q in q2_sample:
-                q['base_score'] = 150  # 中等文字題
-            elif q in q3_sample:
-                q['base_score'] = 200  # 困難文字題
-            else:
-                q['base_score'] = 150  # 圖片 / 影片題
-
-            # 3. 打亂該題的選項順序（正確答案 answer 保持不變）
             if 'options' in q and isinstance(q['options'], list):
                 random.shuffle(q['options'])
 
-        # 4. 合併並打亂題目出現順序
         random.shuffle(selected_raw)
         
         r['selected_questions'] = selected_raw
@@ -698,8 +806,23 @@ def send_question(room):
     else:
         # 💡 遊戲結束時將狀態改為 FINISHED
         r['status'] = "FINISHED"
-        leaderboard = sorted(r['players'], key=lambda x: x['score'], reverse=True)
-        emit('game_over', {"leaderboard": leaderboard}, room=room)
+        
+        # 1. 將本局玩家寫入全域排行榜
+        for p in r['players']:
+            GLOBAL_LEADERBOARD.append(copy.deepcopy(p))
+        # 2. 印出所有歷史玩家紀錄（包含年齡）至後台控制台 Log
+        print("=== 當前所有玩家紀錄 ===")
+        for p in GLOBAL_LEADERBOARD:
+            print(f"姓名: {p['name']}, 年齡: {p.get('age', '未提供')}, 本命: {p['bias']}, 答對: {p.get('correct_count', 0)}, 得分: {p['score']}")
+
+        # 3. 依照分數排序全域榜單，取前 30 名發給前端
+        sorted_global = sorted(GLOBAL_LEADERBOARD, key=lambda x: x['score'], reverse=True)
+        top_30 = sorted_global[:30]
+        
+        emit('game_over', {
+            "leaderboard": top_30, 
+            "my_result": r['players']
+        }, room=room)
 
 @socketio.on('submit_answer')
 def handle_answer(data):
@@ -715,17 +838,26 @@ def handle_answer(data):
         current_q = r['selected_questions'][r['current_q']]
         base_score = current_q.get('base_score', 100)
         
-        if is_correct:
-            # 保留原本計算方式：難度基礎分 + 時間加分 (剩餘秒數 * 10)
-            earned_score = base_score + int(time_left * 10)
-            for p in r['players']:
-                if p['name'] == name:
+        for p in r['players']:
+            if p['name'] == name:
+                if is_correct:
+                    # 1. 計算並累加得分
+                    earned_score = base_score + int(time_left * 10)
                     p['score'] += earned_score
+                    
+                    # 💡 2. 累計答對題數（確保欄位存在，若無則預設為 0 再加 1）
+                    p['correct_count'] = p.get('correct_count', 0) + 1
 
         # 推進至下一題
         r['current_q'] += 1
         send_question(room)
 
+# 💡 新增主頁查詢排行榜事件
+@socketio.on('get_leaderboard')
+def handle_get_leaderboard():
+    sorted_global = sorted(GLOBAL_LEADERBOARD, key=lambda x: x['score'], reverse=True)
+    emit('update_leaderboard', {"leaderboard": sorted_global[:30]})
+    
 if __name__ == '__main__':
     print("🚀 BABYMONSTER 伺服器啟動中...")
     print("👉 請開啟網址: http://127.0.0.1:5000")
