@@ -360,12 +360,11 @@ HTML_TEMPLATE = """
         </div>
     </div>
     
-    <!-- 💡 請貼在這裡（彩蛋影片彈窗） -->
+    <!-- 💡 彩蛋影片彈窗（修改 src 載入方式） -->
     <div id="bang-modal" class="modal-overlay hidden">
         <div class="modal-content" style="max-width: 420px; position: relative; padding: 15px;">
             <button onclick="closeBangModal()" style="position: absolute; top: 8px; right: 12px; background: none; border: none; color: #ff2a75; font-size: 24px; font-weight: bold; cursor: pointer; z-index: 10;">✖</button>
-            <video id="bang-video" style="width: 100%; border-radius: 10px; margin-top: 15px;" controls playsinline>
-                <source src="{{ url_for('static', filename='bang.mp4') }}" type="video/mp4">
+            <video id="bang-video" src="{{ url_for('static', filename='bang.mp4') }}" style="width: 100%; border-radius: 10px; margin-top: 15px;" controls playsinline>
                 您的瀏覽器不支援影片播放。
             </video>
         </div>
