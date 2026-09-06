@@ -22,7 +22,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 ROOMS = {}
 GLOBAL_LEADERBOARD = []  # 儲存所有玩家的歷史紀錄
-LEADERBOARD_FILE = "leaderboard.json"
+LEADERBOARD_FILE = "/var/data/leaderboard.json"
 
 # 💡 伺服器啟動時自動嘗試讀取舊有紀錄
 if os.path.exists(LEADERBOARD_FILE):
@@ -408,13 +408,19 @@ HTML_TEMPLATE = """
             bgm.pause();
         }
         
-        // 2. 顯示 Modal 並從頭播放影片
+        // 2. 顯示 Modal 並強制重新載入與播放
         document.getElementById('bang-modal').classList.remove('hidden');
         if (bangVideo) {
             bangVideo.currentTime = 0;
-            bangVideo.play().catch(err => console.log("影片自動播放受限:", err));
+            bangVideo.load(); // 💡 強制瀏覽器重新載入影片檔
             
-            // 💡 影片播放結束時自動關閉並繼續背景音樂
+            let playPromise = bangVideo.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.log("影片自動播放被阻擋，等待使用者手動點擊播放:", err);
+                });
+            }
+            
             bangVideo.onended = closeBangModal;
         }
     }
