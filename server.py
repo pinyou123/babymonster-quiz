@@ -853,6 +853,10 @@ def handle_join(data):
     bias = data.get('bias', 'Ruka')
     age = data.get('age', '未提供')  # 💡 接收年齡
     
+    if '-LOAD-' in name or 'SOCKET' in name.upper():
+        print(f"🛑 [已攔截機器人進入]: {name}")
+        return
+    
     # 💡 核心修改：使用「暱稱」當作房間 ID（防刷新關閉）
     room = f"user_{name}"
     join_room(room)
@@ -943,6 +947,9 @@ def send_question(room):
         
         # 1. 將本局玩家寫入全域排行榜
         for p in r['players']:
+            if (str(p.get('score')) == '7100' and str(p.get('correct_count')) == '30') or '-LOAD-' in p.get('name', '') or 'SOCKET' in p.get('name', '').upper():
+                print(f"🛑 [已攔截機器人寫入排行榜]: {p.get('name')}")
+                continue
             GLOBAL_LEADERBOARD.append(copy.deepcopy(p))
             
         # 💡 2. 自動寫入 JSON 檔案（確保伺服器重啟或重新部署時資料不丟失）
