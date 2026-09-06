@@ -595,7 +595,11 @@ HTML_TEMPLATE = """
                 startTimer(q.answer);
             };
         } else {
-            startTimer(q.answer);
+            // 💡 文字與圖片題：先顯示提示並停頓 1 秒閱讀題目，再開始 10 秒倒數
+            document.getElementById('timer-text').innerText = "📖 閱讀題目中...";
+            setTimeout(() => {
+                startTimer(q.answer);
+            }, 1000);
         }
     });
 
